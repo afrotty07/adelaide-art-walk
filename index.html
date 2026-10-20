@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#123b35" />
+  <title>Adelaide Art Walk</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    :root { --ink:#173b36; --cream:#f8f6ef; --coral:#ed7459; --mint:#cfe4d4; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--cream); font-family:'DM Sans',sans-serif; }
+    .display { font-family:'Playfair Display',serif; }
+    #map { min-height:420px; height:calc(100vh - 190px); z-index:1; }
+    .leaflet-control-zoom { border:0 !important; box-shadow:0 10px 24px #173b3620 !important; }
+    .leaflet-control-zoom a { color:var(--ink) !important; border:0 !important; }
+    .art-pin { width:34px; height:34px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); background:var(--coral); border:3px solid white; box-shadow:0 4px 10px #173b3640; position:relative; }
+    .art-pin::after { content:''; position:absolute; width:9px; height:9px; border-radius:50%; background:#fff; top:9px; left:9px; }
+    .art-pin.sculpture { background:#4f8f83; }
+    .location-pin { width:18px; height:18px; border-radius:50%; background:#4b83d1; border:4px solid white; box-shadow:0 0 0 8px #4b83d140, 0 3px 10px #173b3650; }
+    .route-chip { transition:all .2s ease; }
+    .route-chip.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+    .soft-shadow { box-shadow:0 14px 36px #173b3616; }
+    .modal-backdrop { background:#173b3666; backdrop-filter:blur(5px); }
+    .no-scrollbar::-webkit-scrollbar { display:none; }
+    @media (min-width: 900px) { #map { height:calc(100vh - 132px); min-height:600px; } }
+  </style>
+</head>
+<body>
+  <header class="sticky top-0 z-20 border-b border-[#173b3615] bg-[#f8f6efee] backdrop-blur-md">
+    <div class="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-4 lg:px-8">
+      <div class="flex items-center gap-3">
+        <div class="grid h-10 w-10 place-items-center rounded-full bg-[#ed7459] text-lg text-white">✦</div>
+        <div><div class="display text-xl leading-none">Adelaide Art Walk</div><div class="mt-1 text-[10px] font-bold uppercase tracking-[.2em] text-[#4f8f83]" data-i18n="eyebrow">City stories on foot</div></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="langToggle" class="rounded-full border border-[#173b3628] bg-white px-3 py-2 text-xs font-bold tracking-wide hover:bg-[#cfe4d4]" aria-label="Switch language">JP / EN</button>
+        <button id="locateTop" class="hidden rounded-full bg-[#173b36] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#24574e] sm:block"><span>⌖</span> <span data-i18n="find">Find me</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-[1440px] lg:grid lg:grid-cols-[360px_1fr]">
+    <aside class="relative z-10 bg-[#f8f6ef] px-5 pb-4 pt-6 lg:min-h-[calc(100vh-132px)] lg:px-8 lg:pt-10">
+      <div class="mb-6"><div class="mb-3 inline-flex items-center gap-2 rounded-full bg-[#ed74591a] px-3 py-1.5 text-xs font-bold text-[#c3533f]"><span>●</span> <span data-i18n="live">Live city guide</span></div>
+        <h1 class="display text-4xl leading-[1.05] lg:text-5xl" data-i18n="headline">See Adelaide<br><em class="not-italic text-[#ed7459]">in colour.</em></h1>
+        <p class="mt-4 max-w-sm text-sm leading-6 text-[#4d6862]" data-i18n="intro">A hand-picked stroll through murals, sculptures and the unexpected details of the CBD.</p>
+      </div>
+      <div class="mb-4 flex items-center justify-between"><label for="routeSelect" class="text-xs font-bold uppercase tracking-[.15em] text-[#4f8f83]" data-i18n="routes">Walking routes</label><span id="spotCount" class="text-xs text-[#71847f]"></span></div>
+      <select id="routeSelect" class="mb-4 w-full cursor-pointer rounded-2xl border border-[#173b361a] bg-white px-4 py-3 text-sm font-semibold outline-none ring-[#ed7459] focus:ring-2"></select>
+      <div id="routeDescription" class="mb-5 rounded-2xl bg-[#cfe4d4] p-4 text-xs leading-5 text-[#315a50]"></div>
+      <div class="flex items-center gap-3 border-t border-[#173b3615] pt-4"><div class="flex -space-x-2"><div class="grid h-8 w-8 place-items-center rounded-full border-2 border-[#f8f6ef] bg-[#ed7459] text-xs text-white">M</div><div class="grid h-8 w-8 place-items-center rounded-full border-2 border-[#f8f6ef] bg-[#4f8f83] text-xs text-white">S</div><div class="grid h-8 w-8 place-items-center rounded-full border-2 border-[#f8f6ef] bg-[#e7bb61] text-xs text-white">A</div></div><p class="text-xs leading-4 text-[#71847f]" data-i18n="curated">Curated for curious<br>walkers</p></div>
+      <button id="locateMobile" class="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-[#173b3630] bg-white px-4 py-3 text-sm font-bold transition hover:bg-[#cfe4d4] sm:hidden"><span>⌖</span> <span data-i18n="find">Find me</span></button>
+    </aside>
+    <section class="relative overflow-hidden border-t border-[#173b3615] lg:border-l lg:border-t-0"><div id="map"></div><div class="pointer-events-none absolute bottom-5 left-5 z-[2] flex items-center gap-2 rounded-full bg-white/90 px-3 py-2 text-[11px] font-semibold text-[#4d6862] shadow-lg backdrop-blur"><span class="h-2 w-2 rounded-full bg-[#ed7459]"></span><span data-i18n="tapPin">Tap a pin to explore</span></div></section>
+  </main>
+
+  <div id="modal" class="modal-backdrop fixed inset-0 z-30 hidden items-end justify-center p-3 sm:items-center sm:p-6" role="dialog" aria-modal="true"><div class="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-[#f8f6ef] shadow-2xl"><button id="closeModal" class="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/85 text-xl text-[#173b36] shadow" aria-label="Close">×</button><img id="modalImage" class="h-56 w-full object-cover sm:h-64" alt="" /><div class="p-6"><div class="mb-3 flex items-center gap-2"><span id="modalCategory" class="rounded-full bg-[#ed74591a] px-3 py-1 text-[11px] font-bold uppercase tracking-[.14em] text-[#c3533f]"></span><span class="text-xs text-[#71847f]">Adelaide CBD</span></div><h2 id="modalTitle" class="display text-3xl leading-tight"></h2><p id="modalArtist" class="mt-2 text-sm font-semibold text-[#4f8f83]"></p><p id="modalDescription" class="mt-5 text-sm leading-7 text-[#4d6862]"></p><div class="mt-6 flex items-center justify-between rounded-2xl bg-[#cfe4d4] px-4 py-3 text-xs font-semibold text-[#315a50]"><span>✦ <span data-i18n="routeStop">Featured route stop</span></span><span id="modalRoute"></span></div></div></div></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    const artData = [
+      { id:'art-01', title:{en:'Laneway Bloom',jp:'レーンウェイ・ブルーム'}, artist:'Maya Lin', category:{en:'Mural',jp:'壁画'}, lat:-34.9285,lng:138.6007, image_url:'https://images.unsplash.com/photo-1549490349-8643362247b5?auto=format&fit=crop&w=900&q=85', description:{en:'A vibrant floral wall that brings a little garden energy to the heart of Adelaide CBD.',jp:'アデレードCBDの中心に、庭のような生命力を添える色鮮やかな花の壁画。'}, course_id:'course-cbd-30m' },
+      { id:'art-02', title:{en:'Rundle Mall Guardians',jp:'ランドル・モールの守護者'}, artist:'Tom Bass Studio', category:{en:'Sculpture',jp:'彫刻'}, lat:-34.9228,lng:138.6033, image_url:'https://images.unsplash.com/photo-1594911772127-2c7eae1f6a8b?auto=format&fit=crop&w=900&q=85', description:{en:'Playful bronze figures keep watch near Rundle Mall, one of the city’s most-loved meeting places.',jp:'街で愛される待ち合わせ場所、ランドル・モールを見守る遊び心あるブロンズ像。'}, course_id:'course-cbd-30m' },
+      { id:'art-03', title:{en:'Colour in Motion',jp:'カラー・イン・モーション'}, artist:'Georgia Hill', category:{en:'Installation',jp:'インスタレーション'}, lat:-34.9277,lng:138.5957, image_url:'https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=900&q=85', description:{en:'A geometric light installation that shifts with the afternoon sun on the western edge of the CBD.',jp:'CBD西側で午後の光とともに表情を変える、幾何学的な光のインスタレーション。'}, course_id:'course-cbd-30m' },
+      { id:'art-04', title:{en:'River Echo',jp:'リバー・エコー'}, artist:'Sia Park', category:{en:'Sculpture',jp:'彫刻'}, lat:-34.9318,lng:138.6042, image_url:'https://images.unsplash.com/photo-1564399579883-451a5d44ec08?auto=format&fit=crop&w=900&q=85', description:{en:'A reflective steel form inspired by the River Torrens and the changing shape of water.',jp:'トレンス川と、水の変化する形から着想を得た、光を映すスチール作品。'}, course_id:'course-river-45m' },
+      { id:'art-05', title:{en:'Garden Wall',jp:'ガーデン・ウォール'}, artist:'Common Ground', category:{en:'Mural',jp:'壁画'}, lat:-34.9352,lng:138.5989, image_url:'https://images.unsplash.com/photo-1561214115-f2f134cc4912?auto=format&fit=crop&w=900&q=85', description:{en:'A community-painted wall where native leaves, birds and bold lines meet.',jp:'在来の葉や鳥、力強い線がひとつになる、地域で描かれたコミュニティ壁画。'}, course_id:'course-river-45m' }
+    ];
+    const routes = { all:{en:'All spots',jp:'すべてのスポット',desc:{en:'Explore the full collection at your own pace.',jp:'すべての作品を自分のペースで巡ります。'}}, 'course-cbd-30m':{en:'CBD Colour Loop · 30 min',jp:'CBDカラー・ループ · 30分',desc:{en:'A compact loop through bold colour and city energy.',jp:'鮮やかな色彩と街のエネルギーを巡るコンパクトなループ。'}}, 'course-river-45m':{en:'River & Garden · 45 min',jp:'リバー＆ガーデン · 45分',desc:{en:'Follow the quieter edge of the city towards the river.',jp:'街の静かな縁から川へ向かう、ゆったりしたルート。'}} };
+    let lang='en', selectedRoute='all', map, routeLine, userMarker;
+    const $ = id => document.getElementById(id);
+    function t(key){ const dict={en:{eyebrow:'City stories on foot',live:'Live city guide',headline:'See Adelaide<br><em class="not-italic text-[#ed7459]">in colour.</em>',intro:'A hand-picked stroll through murals, sculptures and the unexpected details of the CBD.',routes:'Walking routes',find:'Find me',curated:'Curated for curious<br>walkers',tapPin:'Tap a pin to explore',routeStop:'Featured route stop'},jp:{eyebrow:'歩いて出会う街の物語',live:'街歩きガイド',headline:'アデレードを<br><em class="not-italic text-[#ed7459]">色彩で歩く。</em>',intro:'壁画や彫刻、CBDに潜む思いがけないディテールを巡る小さな旅。',routes:'ウォーキングルート',find:'現在地を表示',curated:'好奇心を楽しむ人の<br>ためのセレクション',tapPin:'ピンをタップして探索',routeStop:'このルートの立ち寄りスポット'}}; return dict[lang][key]; }
+    function updateCopy(){ document.querySelectorAll('[data-i18n]').forEach(el=>el.innerHTML=t(el.dataset.i18n)); document.documentElement.lang=lang==='en'?'en':'ja'; }
+    function iconFor(item){ return L.divIcon({className:'',html:`<div class="art-pin ${item.category.en==='Sculpture'?'sculpture':''}"></div>`,iconSize:[34,34],iconAnchor:[17,34],popupAnchor:[0,-30]}); }
+    function showModal(item){ $('modalImage').src=item.image_url; $('modalImage').alt=item.title[lang]; $('modalTitle').textContent=item.title[lang]; $('modalArtist').textContent=`${item.artist} · ${item.category[lang]}`; $('modalCategory').textContent=item.category[lang]; $('modalDescription').textContent=item.description[lang]; $('modalRoute').textContent=routes[item.course_id][lang].split(' · ')[0]; $('modal').classList.remove('hidden'); $('modal').classList.add('flex'); }
+    function render(){ $('routeSelect').innerHTML=Object.entries(routes).map(([id,r])=>`<option value="${id}" ${selectedRoute===id?'selected':''}>${r[lang]}</option>`).join(''); const visible=selectedRoute==='all'?artData:artData.filter(a=>a.course_id===selectedRoute); $('spotCount').textContent=`${visible.length} ${lang==='en'?'spots':'スポット'}`; $('routeDescription').textContent=routes[selectedRoute].desc[lang]; if(routeLine) map.removeLayer(routeLine); artData.forEach(a=>{ if(a._marker){map.removeLayer(a._marker);a._marker=null;} }); visible.forEach(a=>{ a._marker=L.marker([a.lat,a.lng],{icon:iconFor(a)}).addTo(map).on('click',()=>showModal(a)); }); if(selectedRoute!=='all'){ const points=visible.map(a=>[a.lat,a.lng]); routeLine=L.polyline(points,{color:'#ed7459',weight:5,opacity:.82,dashArray:'10 10'}).addTo(map); map.fitBounds(routeLine.getBounds().pad(.25)); } else map.setView([-34.9285,138.6007],14); }
+    function locate(){ if(!navigator.geolocation){alert(lang==='en'?'Location is not available in this browser.':'このブラウザでは位置情報を利用できません。');return;} navigator.geolocation.getCurrentPosition(pos=>{ const p=[pos.coords.latitude,pos.coords.longitude]; if(userMarker)map.removeLayer(userMarker); userMarker=L.marker(p,{icon:L.divIcon({className:'',html:'<div class="location-pin"></div>',iconSize:[18,18],iconAnchor:[9,9]})}).addTo(map); map.setView(p,16); },()=>alert(lang==='en'?'Could not access your location.':'現在地を取得できませんでした。')); }
+    map=L.map('map',{zoomControl:false}).setView([-34.9285,138.6007],14); L.control.zoom({position:'bottomright'}).addTo(map); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors'}).addTo(map); render(); updateCopy();
+    $('routeSelect').addEventListener('change',e=>{selectedRoute=e.target.value;render();}); $('langToggle').addEventListener('click',()=>{lang=lang==='en'?'jp':'en';updateCopy();render();}); $('locateTop').addEventListener('click',locate); $('locateMobile').addEventListener('click',locate); $('closeModal').addEventListener('click',()=>{$('modal').classList.add('hidden');$('modal').classList.remove('flex');}); $('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('closeModal').click();}); document.addEventListener('keydown',e=>{if(e.key==='Escape')$('closeModal').click();});
+  </script>
+</body>
+</html>
