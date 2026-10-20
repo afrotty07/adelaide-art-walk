@@ -9,6 +9,7 @@ Mobile-first bilingual public art walking guide for Adelaide CBD.
 - Curated walking routes with polyline overlays
 - Artwork detail modal with image, artist, category, and description
 - Browser geolocation button
+- Five locally stored Adelaide artwork images with attribution notes in `assets/art/ATTRIBUTIONS.md`
 
 ## Run locally
 
